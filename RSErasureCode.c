@@ -11,6 +11,7 @@ Lin, Han and Chung, "Novel Polynomial Basis and Its Application to Reed-Solomon 
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef unsigned char GFSymbol;
 #define len 8//2^len: the size of Galois field
@@ -27,16 +28,16 @@ GFSymbol Base[len] = {1, 44234, 15374, 5694, 50562, 60718, 37196, 16402, 27800, 
 #define Size (1<<len)//Field size
 #define mod (Size-1)
 
-GFSymbol log[Size];
-GFSymbol exp[Size];
+GFSymbol logA[Size];
+GFSymbol expA[Size];
 
 //-----Used in decoding procedure-------
 GFSymbol skewVec[mod];//twisted factors used in FFT
 GFSymbol B[Size>>1];//factors used in formal derivative
 GFSymbol log_walsh[Size];//factors used in the evaluation of the error locator polynomial
 
-GFSymbol mulE(GFSymbol a, GFSymbol b){//return a*exp[b] over GF(2^r)
-	return a? exp[(log[a]+b &mod) + (log[a]+b >>len)]: 0;
+GFSymbol mulE(GFSymbol a, GFSymbol b){//return a*expA[b] over GF(2^r)
+	return a? expA[(logA[a]+b &mod) + (logA[a]+b >>len)]: 0;
 }
 
 void walsh(GFSymbol* data, int size){//fast Walsh–Hadamard transform over modulo mod
@@ -93,29 +94,29 @@ void FLT(GFSymbol* data, int size, int index){//FFT in the proposed basis
 	return;
 }
 
-void init(){//initialize log[], exp[]
+void init(){//initialize logA[], expA[]
 	GFSymbol mas = (1<<len-1)-1;
 	GFSymbol state=1;
 	for(int i=0; i<mod; i++){
-		exp[state]=i;
+		expA[state]=i;
         if(state>>len-1){
         	state &= mas;
         	state = state<<1^mask;
         }else
         	state <<= 1;
     }
-    exp[0] = mod;
+    expA[0] = mod;
 
-    log[0] = 0;
+    logA[0] = 0;
 	for(int i=0; i<len; i++)
 		for(int j=0; j<1<<i; j++)
-			log[j+(1<<i)] = log[j] ^ Base[i];
+			logA[j+(1<<i)] = logA[j] ^ Base[i];
     for(int i=0; i<Size; i++)
-        log[i]=exp[log[i]];
+        logA[i]=expA[logA[i]];
 
     for(int i=0; i<Size; i++)
-        exp[log[i]]=i;
-    exp[mod] = exp[0];
+        expA[logA[i]]=i;
+    expA[mod] = expA[0];
 }
 
 
@@ -133,12 +134,12 @@ void init_dec(){//initialize skewVec[], B[], log_walsh[]
 			for(int j=(1<<m)-1; j<s; j+=step)
 				skewVec[j+s] = skewVec[j] ^ base[i];
 		}
-		base[m] = mod-log[mulE(base[m], log[base[m]^1])];
+		base[m] = mod-logA[mulE(base[m], logA[base[m]^1])];
 		for(int i=m+1; i<len-1; i++)
-			base[i] = mulE(base[i], (log[base[i]^1]+base[m])%mod);
+			base[i] = mulE(base[i], (logA[base[i]^1]+base[m])%mod);
 	}
 	for(int i=0; i<Size; i++)
-		skewVec[i] = log[skewVec[i]];
+		skewVec[i] = logA[skewVec[i]];
 
 	base[0] = mod-base[0];
 	for(int i=1; i<len-1; i++)
@@ -151,7 +152,7 @@ void init_dec(){//initialize skewVec[], B[], log_walsh[]
 			B[j+depart] = (B[j] + base[i])%mod;
 	}
 
-	memcpy(log_walsh, log, Size*sizeof(GFSymbol));
+	memcpy(log_walsh, logA, Size*sizeof(GFSymbol));
 	log_walsh[0] = 0;
 	walsh(log_walsh, Size);
 }
